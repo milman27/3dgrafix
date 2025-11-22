@@ -44,11 +44,11 @@ float V3lengthSq(v3 x){
 v3 updatePos(v3 pos, v3 camera, int dir){
     float scale = 0.05f;
     if(dir > 1){
-        camera = (v3){.x = -camera.y, .y = camera.x, .z = 0};
+        camera = (v3){.x = -camera.y, .y = camera.x, 0 };
         dir -= 3;
     }
     v3 normalized = V3normalize((v3){.x = camera.x, .y = camera.y, .z = 0});
-    v3 pos2 = {.x = pos.x + normalized.x*scale*dir, .y = pos.y + normalized.y*scale*dir}; 
+    v3 pos2 = {.x = pos.x + normalized.x*scale*dir, .y = pos.y + normalized.y*scale*dir, .z = pos.z}; 
     return pos2;
 }
 void updateView(v3* camera, float dx, float dy){
@@ -56,8 +56,10 @@ void updateView(v3* camera, float dx, float dy){
     v3 horizontal = V3normalize((v3){.x = -camera->y, .y =camera->x, 0});
     v3 normal = V3normalize((v3){.x = camera->y*horizontal.z - camera->z*horizontal.y, .y = camera->z*horizontal.x - camera->x*horizontal.z, .z = camera->x*horizontal.y - camera->y*horizontal.x} );
     *camera = V3normalize(V3add(V3scalar(dx, horizontal), *camera));
+    if(camera->z*camera->z > 0.999f && (camera->z - dy)*(camera->z - dy) > 0.999f){
+    }else{
     *camera = V3normalize(V3add(V3scalar(-dy, normal), *camera));
-}
+}}
 struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos){
     struct v3list * screen = malloc(world->number * 2 * sizeof(v3)); 
     screen->number = world->number;
@@ -94,7 +96,7 @@ void displayScreen(struct v3list * pixels, Image img){
         int x = (int)(((pixels->v3[i].deg1 + (PI/4))*WIN_WIDTH)/PId2);
         int y = (int)(((pixels->v3[i].deg2 + (PI/4))*WIN_HEIGHT)/PId2);
         
-        ImageDrawPixel(&img, x, y, (Color){0,255,0,255});
+        ImageDrawPixel(&img, x, y, (Color){255,255,255,255});
        }
     }
     
@@ -106,13 +108,13 @@ void displayScreen(struct v3list * pixels, Image img){
 
 int main(){
     v3 cameraVector = {.x = 1.0f, .y = 0.5f, .z = 0.0f};
-    v3 cameraPos = { 0,0,0};
+    v3 playerPos = { 0,0,0};
     struct v3list * worldpoints = malloc(400*sizeof(v3));
     worldpoints->number = 300;
     for(int i = 0; i < worldpoints->number; i++){
         worldpoints->v3[i].E[0] = (float)(i/11) ;
         worldpoints->v3[i].E[1] = (float)(i%11) -5;
-        worldpoints->v3[i].E[2] =  1.0f ;
+        worldpoints->v3[i].E[2] = (i % 2) ?  1.0f : -1.0f ;
     }
     Image img = createWindow(WIN_WIDTH, WIN_HEIGHT);
     struct v3list * pixels; 
@@ -124,23 +126,31 @@ int main(){
         if(IsKeyDown(KEY_Q)){
             EnableCursor();
         }
-        pixels = worldToCamera(worldpoints, cameraVector, cameraPos);
+        pixels = worldToCamera(worldpoints, cameraVector, playerPos);
         Vector2 dM = GetMouseDelta();
         updateView(&cameraVector, dM.x*sens, dM.y*sens);
         if(IsKeyDown(KEY_W)){
-            cameraPos = updatePos(cameraPos, cameraVector, 1);
+            playerPos = updatePos(playerPos, cameraVector, 1);
         }
         if(IsKeyDown(KEY_S)){
-            cameraPos = updatePos(cameraPos, cameraVector, -1);
+            playerPos = updatePos(playerPos, cameraVector, -1);
         }
         if(IsKeyDown(KEY_A)){
-            cameraPos = updatePos(cameraPos, cameraVector, 2);
+            playerPos = updatePos(playerPos, cameraVector, 2);
         }
         if(IsKeyDown(KEY_D)){
-            cameraPos = updatePos(cameraPos, cameraVector, 4);
+            playerPos = updatePos(playerPos, cameraVector, 4);
         }
-
-        printf("Camera x,y,z:%f,%f,%f\n", cameraVector.x, cameraVector.y, cameraVector.z);
+        if(IsKeyDown(KEY_SPACE)){
+           playerPos.z += 0.05f; 
+        }
+        if(IsKeyDown(KEY_LEFT_CONTROL)){
+            playerPos.z -= 0.05f;
+        }
+        if(playerPos.z > 0.0001f){
+            playerPos.z -= 0.02f;
+        }
+        printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z);
         displayScreen(pixels, img);
         free(pixels);
     }

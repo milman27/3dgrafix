@@ -9,6 +9,4 @@ $(BINARY): $(SOURCE) $(DEPS)
 	$(CC) $(SOURCE) $(CFLAGS) $(LFLAGS) -o $(BINARY)
 
 $(DEPS):
-	pushd $(DEPSDIR)
-	make
-	popd
+	make -C $(DEPSDIR)
