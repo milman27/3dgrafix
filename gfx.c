@@ -20,6 +20,9 @@ struct v3list {
     size_t number;
     v3 v3[];
 };
+float V3length(v3 x){
+     return sqrt(x.E[0]*x.E[0]+x.E[1]*x.E[1]+x.E[2]*x.E[2]);
+}
 v3 V3normalize(v3 x){
     v3 y = {0};
     float mag = sqrt(x.E[0]*x.E[0]+x.E[1]*x.E[1]+x.E[2]*x.E[2]);
@@ -51,18 +54,31 @@ v3 updatePos(v3 pos, v3 camera, int dir){
     v3 pos2 = {.x = pos.x + normalized.x*scale*dir, .y = pos.y + normalized.y*scale*dir}; 
     return pos2;
 }
-void updateView(v3* camera, float dx, float dy){
+v3 V3rotate(v3 axis, float angle, v3 vector){
+    if(angle == 0)
+        return vector;
+    v3 horizontal = V3normalize((v3){.x = -axis.y, .y =axis.x, 0});
+    v3 normal = V3normalize((v3){.x = axis.y*horizontal.z - axis.z*horizontal.y, .y = axis.z*horizontal.x - axis.x*horizontal.z, .z = axis.x*horizontal.y - axis.y*horizontal.x} );
+    float len = V3length(vector);
+    vector = V3normalize(vector);
+    float currentAngle = asinf(V3dotProduct(vector, normal));
+    vector = V3scalar(len, V3add(V3scalar(cosf(angle + currentAngle), horizontal), V3scalar(sinf(angle + currentAngle), normal))); 
+    return vector;
+}
+void updateView(v3* camera, float dx, float dy, float dth){
     *camera = V3normalize(*camera);
     v3 horizontal = V3normalize((v3){.x = -camera->y, .y =camera->x, 0});
+    horizontal = V3rotate(*camera, dth, horizontal);
     v3 normal = V3normalize((v3){.x = camera->y*horizontal.z - camera->z*horizontal.y, .y = camera->z*horizontal.x - camera->x*horizontal.z, .z = camera->x*horizontal.y - camera->y*horizontal.x} );
     *camera = V3normalize(V3add(V3scalar(dx, horizontal), *camera));
     *camera = V3normalize(V3add(V3scalar(-dy, normal), *camera));
 }
-struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos){
+struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos, float dth){
     struct v3list * screen = malloc(world->number * 2 * sizeof(v3)); 
     screen->number = world->number;
     camera = V3normalize(camera);
     v3 horizontal = V3normalize((v3){.x = -camera.y, .y =camera.x, 0});
+    horizontal = V3rotate(camera, dth, horizontal);
     v3 normal = V3normalize((v3){.x = camera.y*horizontal.z - camera.z*horizontal.y, .y = camera.z*horizontal.x - camera.x*horizontal.z, .z = camera.x*horizontal.y - camera.y*horizontal.x} );
     for(int i = 0; i < screen->number; i++){
         float dotHoriz = V3dotProduct(horizontal, V3add(world->v3[i], V3scalar(-1, cameraPos)));
@@ -107,6 +123,7 @@ void displayScreen(struct v3list * pixels, Image img){
 int main(){
     v3 cameraVector = {.x = 1.0f, .y = 0.5f, .z = 0.0f};
     v3 cameraPos = { 0,0,0};
+    float cameraTilt = 0;
     struct v3list * worldpoints = malloc(400*sizeof(v3));
     worldpoints->number = 300;
     for(int i = 0; i < worldpoints->number; i++){
@@ -124,9 +141,9 @@ int main(){
         if(IsKeyDown(KEY_Q)){
             EnableCursor();
         }
-        pixels = worldToCamera(worldpoints, cameraVector, cameraPos);
+        pixels = worldToCamera(worldpoints, cameraVector, cameraPos, cameraTilt);
         Vector2 dM = GetMouseDelta();
-        updateView(&cameraVector, dM.x*sens, dM.y*sens);
+        updateView(&cameraVector, dM.x*sens, dM.y*sens, cameraTilt);
         if(IsKeyDown(KEY_W)){
             cameraPos = updatePos(cameraPos, cameraVector, 1);
         }
@@ -138,6 +155,9 @@ int main(){
         }
         if(IsKeyDown(KEY_D)){
             cameraPos = updatePos(cameraPos, cameraVector, 4);
+        }
+        if(IsKeyDown(KEY_Q)){
+            cameraTilt += 0.01f;
         }
 
         printf("Camera x,y,z:%f,%f,%f\n", cameraVector.x, cameraVector.y, cameraVector.z);

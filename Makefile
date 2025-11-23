@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -O3
+CFLAGS=-Wall -pedantic -O0 -g
 LFLAGS=-Lraylib-5.5/src/ -l:libraylib.a -lm 
 SOURCE=gfx.c
 BINARY=gfx
