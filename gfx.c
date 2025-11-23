@@ -144,7 +144,7 @@ int main(){
     float cameraTilt = 0;
     v3 playerPos = { 0,0,0};
     struct v3list * worldpoints = malloc(400*sizeof(v3));
-    worldpoints->number = 351;
+    worldpoints->number = 390;
     for(int i = 0; i < worldpoints->number; i++){
         worldpoints->v3[i].E[0] = (float)(i/11) ;
         worldpoints->v3[i].E[1] = (float)(i%11) -5;
@@ -157,6 +157,9 @@ int main(){
     Image img = createWindow(WIN_WIDTH, WIN_HEIGHT);
     struct v3list * pixels; 
     float sens = 0.001f;
+    int index = 300;
+    SetTraceLogLevel(255);
+    int MouseWasUp = 0;
     while(!WindowShouldClose()){
         if(IsMouseButtonDown(MOUSE_LEFT_BUTTON) && IsCursorOnScreen()){
            DisableCursor(); 
@@ -196,7 +199,20 @@ int main(){
         if(playerPos.z > 0.0001f){
             playerPos.z -= 0.02f;
         }
-        printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\nfps:%d\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z, GetFPS());
+        if(IsMouseButtonDown(MOUSE_RIGHT_BUTTON) && MouseWasUp){
+            
+            worldpoints->v3[index] = V3add(cameraVector, playerPos);
+            printf("placing dot\nindex:%d,pos:%f,%f,%f\n", index, worldpoints->v3[index].x, worldpoints->v3[index].y, worldpoints->v3[index].z);
+            index++;
+            if(index>390){
+                index = 0;
+            }
+            MouseWasUp = 0;
+        }
+        if(IsMouseButtonUp(MOUSE_RIGHT_BUTTON)){
+            MouseWasUp = 1;
+        }
+        //printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\nfps:%d\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z, GetFPS());
         displayScreen(pixels, img);
         free(pixels);
     }
