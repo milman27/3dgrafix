@@ -74,13 +74,8 @@ void updateView(v3* camera, float dx, float dy, float dth){
     if(camera->z*camera->z > 0.999f && (camera->z - dy)*(camera->z - dy) > 0.999f){
     }else{
     *camera = V3normalize(V3add(V3scalar(-dy, normal), *camera));
-<<<<<<< HEAD
-}
+    }}
 struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos, float dth){
-=======
-}}
-struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos){
->>>>>>> 7a8cd78fcf51de60a606f38f03a1c73faeb4d1f6
     struct v3list * screen = malloc(world->number * 2 * sizeof(v3)); 
     screen->number = world->number;
     camera = V3normalize(camera);
@@ -129,12 +124,8 @@ void displayScreen(struct v3list * pixels, Image img){
 
 int main(){
     v3 cameraVector = {.x = 1.0f, .y = 0.5f, .z = 0.0f};
-<<<<<<< HEAD
-    v3 cameraPos = { 0,0,0};
     float cameraTilt = 0;
-=======
     v3 playerPos = { 0,0,0};
->>>>>>> 7a8cd78fcf51de60a606f38f03a1c73faeb4d1f6
     struct v3list * worldpoints = malloc(400*sizeof(v3));
     worldpoints->number = 300;
     for(int i = 0; i < worldpoints->number; i++){
@@ -152,11 +143,7 @@ int main(){
         if(IsKeyDown(KEY_Q)){
             EnableCursor();
         }
-<<<<<<< HEAD
-        pixels = worldToCamera(worldpoints, cameraVector, cameraPos, cameraTilt);
-=======
-        pixels = worldToCamera(worldpoints, cameraVector, playerPos);
->>>>>>> 7a8cd78fcf51de60a606f38f03a1c73faeb4d1f6
+        pixels = worldToCamera(worldpoints, cameraVector, playerPos, cameraTilt);
         Vector2 dM = GetMouseDelta();
         updateView(&cameraVector, dM.x*sens, dM.y*sens, cameraTilt);
         if(IsKeyDown(KEY_W)){
@@ -171,13 +158,9 @@ int main(){
         if(IsKeyDown(KEY_D)){
             playerPos = updatePos(playerPos, cameraVector, 4);
         }
-<<<<<<< HEAD
         if(IsKeyDown(KEY_Q)){
             cameraTilt += 0.01f;
         }
-
-        printf("Camera x,y,z:%f,%f,%f\n", cameraVector.x, cameraVector.y, cameraVector.z);
-=======
         if(IsKeyDown(KEY_SPACE)){
            playerPos.z += 0.05f; 
         }
@@ -188,7 +171,6 @@ int main(){
             playerPos.z -= 0.02f;
         }
         printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z);
->>>>>>> 7a8cd78fcf51de60a606f38f03a1c73faeb4d1f6
         displayScreen(pixels, img);
         free(pixels);
     }
