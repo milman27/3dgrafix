@@ -57,12 +57,25 @@ v3 updatePos(v3 pos, v3 camera, int dir){
 v3 V3rotate(v3 axis, float angle, v3 vector){
     if(angle == 0)
         return vector;
-    v3 horizontal = V3normalize((v3){.x = -axis.y, .y =axis.x, 0});
+    v3 horizontal;
+    if(V3dotProduct(axis, vector)*V3dotProduct(axis,vector) < 0.00001f){
+       horizontal = V3normalize(vector);    
+    }else{
+       horizontal = V3normalize((v3){.x = -axis.y, .y =axis.x, 0});
+    }
+    axis = V3normalize(axis);
     v3 normal = V3normalize((v3){.x = axis.y*horizontal.z - axis.z*horizontal.y, .y = axis.z*horizontal.x - axis.x*horizontal.z, .z = axis.x*horizontal.y - axis.y*horizontal.x} );
     float len = V3length(vector);
     vector = V3normalize(vector);
-    float currentAngle = asinf(V3dotProduct(vector, normal));
-    vector = V3scalar(len, V3add(V3scalar(cosf(angle + currentAngle), horizontal), V3scalar(sinf(angle + currentAngle), normal))); 
+    float dotAxis = V3dotProduct(axis, vector);
+    float dotNormal = V3dotProduct(vector, normal);
+    float dotHoriz = V3dotProduct(vector, horizontal);
+    float lenHoriz = (sinf(angle)*dotNormal + cosf(angle)*dotHoriz);
+    float lenNormal = (cosf(angle)*dotNormal - sinf(angle)*dotHoriz);
+    v3 l = V3scalar(lenHoriz, horizontal);
+    v3 j = V3scalar(lenNormal, normal);
+    v3 p = V3scalar(dotAxis, axis);
+    vector = V3scalar(len, V3add(l, V3add(j, p)));
     return vector;
 }
 void updateView(v3* camera, float dx, float dy, float dth){
@@ -70,11 +83,15 @@ void updateView(v3* camera, float dx, float dy, float dth){
     v3 horizontal = V3normalize((v3){.x = -camera->y, .y =camera->x, 0});
     horizontal = V3rotate(*camera, dth, horizontal);
     v3 normal = V3normalize((v3){.x = camera->y*horizontal.z - camera->z*horizontal.y, .y = camera->z*horizontal.x - camera->x*horizontal.z, .z = camera->x*horizontal.y - camera->y*horizontal.x} );
-    *camera = V3normalize(V3add(V3scalar(dx, horizontal), *camera));
+    //*camera = V3normalize(V3add(V3scalar(dx, horizontal), *camera));
+    *camera = V3rotate(normal, -dx, *camera);
     if(camera->z*camera->z > 0.999f && (camera->z - dy)*(camera->z - dy) > 0.999f){
     }else{
-    *camera = V3normalize(V3add(V3scalar(-dy, normal), *camera));
-    }}
+        *camera = V3rotate(horizontal, -dy, *camera);
+    //    *camera = V3normalize(V3add(V3scalar(-dy, normal), *camera));
+    } 
+}
+
 struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos, float dth){
     struct v3list * screen = malloc(world->number * 2 * sizeof(v3)); 
     screen->number = world->number;
@@ -127,12 +144,16 @@ int main(){
     float cameraTilt = 0;
     v3 playerPos = { 0,0,0};
     struct v3list * worldpoints = malloc(400*sizeof(v3));
-    worldpoints->number = 300;
+    worldpoints->number = 351;
     for(int i = 0; i < worldpoints->number; i++){
         worldpoints->v3[i].E[0] = (float)(i/11) ;
         worldpoints->v3[i].E[1] = (float)(i%11) -5;
         worldpoints->v3[i].E[2] = (i % 2) ?  1.0f : -1.0f ;
     }
+    worldpoints->v3[320] = (v3){0.25, 0.25, 0.25}; 
+    worldpoints->v3[329] = (v3){0.5, 0.5, 0.5}; 
+    worldpoints->v3[350] = (v3){0.25, 0.25, 0.25}; 
+    worldpoints->v3[349] = (v3){0.5, 0.5, 0.5}; 
     Image img = createWindow(WIN_WIDTH, WIN_HEIGHT);
     struct v3list * pixels; 
     float sens = 0.001f;
@@ -140,9 +161,11 @@ int main(){
         if(IsMouseButtonDown(MOUSE_LEFT_BUTTON) && IsCursorOnScreen()){
            DisableCursor(); 
         }
-        if(IsKeyDown(KEY_Q)){
+        if(IsKeyDown(KEY_K)){
             EnableCursor();
         }
+        worldpoints->v3[350] = V3rotate((v3){1,1,0}, sens*50, worldpoints->v3[350]);
+        worldpoints->v3[349] = V3rotate((v3){1,1,0}, sens*50, worldpoints->v3[349]);
         pixels = worldToCamera(worldpoints, cameraVector, playerPos, cameraTilt);
         Vector2 dM = GetMouseDelta();
         updateView(&cameraVector, dM.x*sens, dM.y*sens, cameraTilt);
@@ -159,6 +182,9 @@ int main(){
             playerPos = updatePos(playerPos, cameraVector, 4);
         }
         if(IsKeyDown(KEY_Q)){
+            cameraTilt -= 0.01f;
+        }
+        if(IsKeyDown(KEY_E)){
             cameraTilt += 0.01f;
         }
         if(IsKeyDown(KEY_SPACE)){
@@ -170,7 +196,7 @@ int main(){
         if(playerPos.z > 0.0001f){
             playerPos.z -= 0.02f;
         }
-        printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z);
+        printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\nfps:%d\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z, GetFPS());
         displayScreen(pixels, img);
         free(pixels);
     }
