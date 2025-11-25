@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
-#define WIN_WIDTH 1920
-#define WIN_HEIGHT 1080
+#define WIN_WIDTH 1000
+#define WIN_HEIGHT 1000
 typedef struct v3{
     union {
         struct {
@@ -152,8 +152,8 @@ int main(){
     }
     worldpoints->v3[320] = (v3){0.25, 0.25, 0.25}; 
     worldpoints->v3[329] = (v3){0.5, 0.5, 0.5}; 
-    worldpoints->v3[350] = (v3){0.25, 0.25, 0.25}; 
-    worldpoints->v3[349] = (v3){0.5, 0.5, 0.5}; 
+    worldpoints->v3[350] = (v3){1.25, 0.25, 0.25}; 
+    worldpoints->v3[349] = (v3){1.5, 0.5, 0.5}; 
     Image img = createWindow(WIN_WIDTH, WIN_HEIGHT);
     struct v3list * pixels; 
     float sens = 0.001f;
@@ -167,8 +167,8 @@ int main(){
         if(IsKeyDown(KEY_K)){
             EnableCursor();
         }
-        worldpoints->v3[350] = V3rotate((v3){1,1,0}, sens*50, worldpoints->v3[350]);
-        worldpoints->v3[349] = V3rotate((v3){1,1,0}, sens*50, worldpoints->v3[349]);
+        worldpoints->v3[350] = V3rotate((v3){1,1,1}, sens*50, worldpoints->v3[350]);
+        worldpoints->v3[349] = V3rotate((v3){1,1,1}, sens*50, worldpoints->v3[349]);
         pixels = worldToCamera(worldpoints, cameraVector, playerPos, cameraTilt);
         Vector2 dM = GetMouseDelta();
         updateView(&cameraVector, dM.x*sens, dM.y*sens, cameraTilt);
