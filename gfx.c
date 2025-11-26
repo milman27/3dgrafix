@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
-#define WIN_WIDTH 1000
-#define WIN_HEIGHT 1000
+#define WIN_WIDTH 1920
+#define WIN_HEIGHT 1080
 typedef struct v3{
     union {
         struct {
@@ -100,15 +100,21 @@ struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos, fl
     horizontal = V3rotate(camera, dth, horizontal);
     v3 normal = V3normalize((v3){.x = camera.y*horizontal.z - camera.z*horizontal.y, .y = camera.z*horizontal.x - camera.x*horizontal.z, .z = camera.x*horizontal.y - camera.y*horizontal.x} );
     for(int i = 0; i < screen->number; i++){
-        float dotHoriz = V3dotProduct(horizontal, V3add(world->v3[i], V3scalar(-1, cameraPos)));
         float dotNorm = V3dotProduct(normal, V3add(world->v3[i], V3scalar(-1, cameraPos)));
-        float dotLength = V3dotProduct(horizontal, V3add(world->v3[i], V3scalar(-1, cameraPos)));
-        v3 projy = V3add(V3scalar(-dotHoriz, horizontal), V3add(world->v3[i], V3scalar(-1, cameraPos)));
         v3 projx = V3add(V3scalar(-dotNorm, normal), V3add(world->v3[i], V3scalar(-1, cameraPos)));
-        v3 projlen = V3add(V3scalar(-dotLength, horizontal), V3add(world->v3[i], V3scalar(-1, cameraPos)));
         float anglex = asinf(V3dotProduct(V3normalize(projx),V3normalize(horizontal)));
-        float angley = -asinf(V3dotProduct(V3normalize(projy),V3normalize(normal)));
+
+        float dotLength = V3dotProduct(horizontal, V3add(world->v3[i], V3scalar(-1, cameraPos)));
+        v3 projlen = V3add(V3scalar(-dotLength, horizontal), V3add(world->v3[i], V3scalar(-1, cameraPos)));
         float length = V3dotProduct(V3normalize(projlen),V3normalize(camera));
+        anglex = (length >= 0) ? anglex : (anglex >= 0) ? 2*(PI/2 - anglex) + anglex : 2*(-PI/2 - anglex) + anglex;
+
+        v3 corrected = V3rotate(normal, anglex, V3add(world->v3[i], V3scalar(-1, cameraPos)));
+        float dotHoriz = V3dotProduct(horizontal, corrected);
+        v3 projy = V3add(V3scalar(-dotHoriz, horizontal), corrected);
+        float angley = -asinf(V3dotProduct(V3normalize(projy),V3normalize(normal)));
+        //angley = (length >= 0) ? angley: (angley >= 0) ? 2*(PI/2 - angley) + angley : 2*(-PI/2 - angley) + angley;
+
         screen->v3[i] = (v3){anglex, angley, length};
     }
     return screen;
@@ -119,15 +125,18 @@ Image createWindow(int x, int y){
      image = LoadImageFromScreen();
     return image;
 }
-void displayScreen(struct v3list * pixels, Image img){
+void displayScreen(struct v3list * pixels, Image img, float fovX, float fovY){
     ImageClearBackground(&img, (Color){0,0,0,255});
+    fovX = fovX/360*PI*2;
+    fovY = fovY/360*PI*2;
+    
     for(int i = 0; i < pixels->number; i++){
-       if(pixels->v3[i].deg1 < PI/4 && pixels->v3[i].deg1 > -PI/4
-           && pixels->v3[i].deg2 < PI/4 && pixels->v3[i].deg2 > -PI/4 && pixels->v3[i].dist > 0)
+       if(pixels->v3[i].deg1 < fovX/2 && pixels->v3[i].deg1 > -fovX/2
+           && pixels->v3[i].deg2 < fovY/2 && pixels->v3[i].deg2 > -fovY/2 )
        {
         float PId2 = PI/2;
-        int x = (int)(((pixels->v3[i].deg1 + (PI/4))*WIN_WIDTH)/PId2);
-        int y = (int)(((pixels->v3[i].deg2 + (PI/4))*WIN_HEIGHT)/PId2);
+        int x = (int)(((pixels->v3[i].deg1 + (fovX/2))*WIN_WIDTH)/fovX);
+        int y = (int)(((pixels->v3[i].deg2 + (fovY/2))*WIN_HEIGHT)/fovY);
         
         ImageDrawPixel(&img, x, y, (Color){255,255,255,255});
        }
@@ -138,22 +147,40 @@ void displayScreen(struct v3list * pixels, Image img){
     EndDrawing();
     UnloadTexture(texture);
 }
+void createWorld(struct v3list * world){
+    for(int i = 0; i < world->number; i++){
+        world->v3[i].E[0] = (float)(i/11) ;
+        world->v3[i].E[1] = (float)(i%11) -5;
+        world->v3[i].E[2] = (i % 2) ?  1.0f : -1.0f ;
+    }
+    world->v3[320] = (v3){0.25, 0.25, 0.25}; 
+    world->v3[329] = (v3){0.5, 0.5, 0.5}; 
+    world->v3[350] = (v3){1.25, 0.25, 0.25}; 
+    world->v3[349] = (v3){1.5, 0.5, 0.5}; 
 
+}
+v3 V3crossProduct(v3 camera, v3 horizontal){
+    return (v3){.x = camera.y*horizontal.z - camera.z*horizontal.y, .y = camera.z*horizontal.x - camera.x*horizontal.z, .z = camera.x*horizontal.y - camera.y*horizontal.x};  
+}
+void focusCamera(v3 * cameraVector, v3 focusPoint, v3 playerPos, float * cameraTilt, v3 rotator){
+            *cameraVector = V3add(focusPoint, V3scalar(-1, playerPos));
+            if(V3length(rotator)){
+            rotator = V3normalize(rotator);
+            v3 horizontal = V3normalize((v3){.x = -cameraVector->y, .y =cameraVector->x, 0});
+            v3 scale = V3scalar(V3dotProduct(rotator, playerPos), rotator); 
+            v3 normalPlayerPos = V3add(V3scalar(-1, scale), playerPos);
+            v3 movementDirection = V3normalize(V3crossProduct(normalPlayerPos, rotator));
+            float sign = (V3dotProduct(horizontal, rotator) >= 0 ? 1 : -1);
+            *cameraTilt = sign * acosf(V3dotProduct(horizontal, movementDirection)) ;
+            }
+}
 int main(){
     v3 cameraVector = {.x = 1.0f, .y = 0.5f, .z = 0.0f};
     float cameraTilt = 0;
     v3 playerPos = { 0,0,0};
     struct v3list * worldpoints = malloc(400*sizeof(v3));
     worldpoints->number = 390;
-    for(int i = 0; i < worldpoints->number; i++){
-        worldpoints->v3[i].E[0] = (float)(i/11) ;
-        worldpoints->v3[i].E[1] = (float)(i%11) -5;
-        worldpoints->v3[i].E[2] = (i % 2) ?  1.0f : -1.0f ;
-    }
-    worldpoints->v3[320] = (v3){0.25, 0.25, 0.25}; 
-    worldpoints->v3[329] = (v3){0.5, 0.5, 0.5}; 
-    worldpoints->v3[350] = (v3){1.25, 0.25, 0.25}; 
-    worldpoints->v3[349] = (v3){1.5, 0.5, 0.5}; 
+    createWorld(worldpoints);
     Image img = createWindow(WIN_WIDTH, WIN_HEIGHT);
     struct v3list * pixels; 
     float sens = 0.001f;
@@ -167,10 +194,16 @@ int main(){
         if(IsKeyDown(KEY_K)){
             EnableCursor();
         }
-        worldpoints->v3[350] = V3rotate((v3){1,1,1}, sens*50, worldpoints->v3[350]);
-        worldpoints->v3[349] = V3rotate((v3){1,1,1}, sens*50, worldpoints->v3[349]);
+        worldpoints->v3[350] = V3rotate((v3){1,1,1}, sens*5, worldpoints->v3[350]);
+        worldpoints->v3[349] = V3rotate((v3){1,1,1}, sens*5, worldpoints->v3[349]);
+        if(IsKeyDown(KEY_G)){
+            playerPos = worldpoints->v3[349];
+            v3 rotator = {1,1,1};
+            focusCamera(&cameraVector, worldpoints->v3[320], playerPos, &cameraTilt, rotator);
+        }
         pixels = worldToCamera(worldpoints, cameraVector, playerPos, cameraTilt);
         Vector2 dM = GetMouseDelta();
+
         updateView(&cameraVector, dM.x*sens, dM.y*sens, cameraTilt);
         if(IsKeyDown(KEY_W)){
             playerPos = updatePos(playerPos, cameraVector, 1);
@@ -213,7 +246,7 @@ int main(){
             MouseWasUp = 1;
         }
         //printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\nfps:%d\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z, GetFPS());
-        displayScreen(pixels, img);
+        displayScreen(pixels, img, 360, 180);
         free(pixels);
     }
 }
