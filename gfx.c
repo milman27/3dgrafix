@@ -1,10 +1,11 @@
-#include "./raylib-5.5/src/raylib.h"
+#include "./raylib-5.5/src/raylib.h" 
 #include <malloc.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
 #define WIN_WIDTH 1920
 #define WIN_HEIGHT 1080
+#define MY_PROJ 1
 typedef struct v3{
     union {
         struct {
@@ -50,7 +51,7 @@ v3 updatePos(v3 pos, v3 camera, int dir){
         camera = (v3){.x = -camera.y, .y = camera.x, 0 };
         dir -= 3;
     }
-    v3 normalized = V3normalize((v3){.x = camera.x, .y = camera.y, .z = 0});
+    v3 normalized = V3normalize((v3){.x = sinf(-camera.x), .y = sinf(camera.y), .z = 0});
     v3 pos2 = {.x = pos.x + normalized.x*scale*dir, .y = pos.y + normalized.y*scale*dir, .z = pos.z}; 
     return pos2;
 }
@@ -62,6 +63,9 @@ v3 V3rotate(v3 axis, float angle, v3 vector){
        horizontal = V3normalize(vector);    
     }else{
        horizontal = V3normalize((v3){.x = -axis.y, .y =axis.x, 0});
+    } 
+    if(V3normalize(axis).z == 1){
+        horizontal = (v3){1,0,0};
     }
     axis = V3normalize(axis);
     v3 normal = V3normalize((v3){.x = axis.y*horizontal.z - axis.z*horizontal.y, .y = axis.z*horizontal.x - axis.x*horizontal.z, .z = axis.x*horizontal.y - axis.y*horizontal.x} );
@@ -79,27 +83,37 @@ v3 V3rotate(v3 axis, float angle, v3 vector){
     return vector;
 }
 void updateView(v3* camera, float dx, float dy, float dth){
+#if MY_PROJ
     *camera = V3normalize(*camera);
     v3 horizontal = V3normalize((v3){.x = -camera->y, .y =camera->x, 0});
     horizontal = V3rotate(*camera, dth, horizontal);
     v3 normal = V3normalize((v3){.x = camera->y*horizontal.z - camera->z*horizontal.y, .y = camera->z*horizontal.x - camera->x*horizontal.z, .z = camera->x*horizontal.y - camera->y*horizontal.x} );
     //*camera = V3normalize(V3add(V3scalar(dx, horizontal), *camera));
+    printf("angle:%f,%f\n", dx, dy);
     *camera = V3rotate(normal, -dx, *camera);
     if(camera->z*camera->z > 0.999f && (camera->z - dy)*(camera->z - dy) > 0.999f){
     }else{
         *camera = V3rotate(horizontal, -dy, *camera);
     //    *camera = V3normalize(V3add(V3scalar(-dy, normal), *camera));
     } 
+#else
+    camera->x += dx;
+    camera->y += dy;
+#endif
 }
 
 struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos, float dth){
     struct v3list * screen = malloc(world->number * 2 * sizeof(v3)); 
     screen->number = world->number;
+#if MY_PROJ
     camera = V3normalize(camera);
+#endif
     v3 horizontal = V3normalize((v3){.x = -camera.y, .y =camera.x, 0});
     horizontal = V3rotate(camera, dth, horizontal);
+    float focalLength = 0.5;
     v3 normal = V3normalize((v3){.x = camera.y*horizontal.z - camera.z*horizontal.y, .y = camera.z*horizontal.x - camera.x*horizontal.z, .z = camera.x*horizontal.y - camera.y*horizontal.x} );
     for(int i = 0; i < screen->number; i++){
+#if MY_PROJ
         float dotNorm = V3dotProduct(normal, V3add(world->v3[i], V3scalar(-1, cameraPos)));
         v3 projx = V3add(V3scalar(-dotNorm, normal), V3add(world->v3[i], V3scalar(-1, cameraPos)));
         float anglex = asinf(V3dotProduct(V3normalize(projx),V3normalize(horizontal)));
@@ -115,6 +129,22 @@ struct v3list * worldToCamera(struct v3list * world, v3 camera, v3 cameraPos, fl
         float angley = -asinf(V3dotProduct(V3normalize(projy),V3normalize(normal)));
         //angley = (length >= 0) ? angley: (angley >= 0) ? 2*(PI/2 - angley) + angley : 2*(-PI/2 - angley) + angley;
 
+#if 0  
+        v3 correctedy = V3rotate((v3){world->v3[i].y, -world->v3[i].x, 0}, -angley, V3add(world->v3[i], V3scalar(-1, cameraPos)));
+        dotNorm = V3dotProduct(normal, correctedy);
+        projx = V3add(V3scalar(-dotNorm, normal), correctedy);
+        anglex = asinf(V3dotProduct(V3normalize(projx),V3normalize(horizontal)));
+#endif    
+#else
+        v3 correctedWorld = V3add(world->v3[i], V3scalar(-1, cameraPos));
+        correctedWorld = V3rotate((v3){1,0,0}, dth, correctedWorld);
+        correctedWorld = V3rotate((v3){0,0,1}, (camera.x), correctedWorld);
+        correctedWorld = V3rotate((v3){0,1,0}, (camera.y) + PI/2, correctedWorld);
+        float anglex = focalLength/correctedWorld.z*correctedWorld.y;
+        float length = correctedWorld.z;
+        float angley = focalLength/correctedWorld.z*correctedWorld.x;
+#endif
+        
         screen->v3[i] = (v3){anglex, angley, length};
     }
     return screen;
@@ -132,7 +162,11 @@ void displayScreen(struct v3list * pixels, Image img, float fovX, float fovY){
     
     for(int i = 0; i < pixels->number; i++){
        if(pixels->v3[i].deg1 < fovX/2 && pixels->v3[i].deg1 > -fovX/2
-           && pixels->v3[i].deg2 < fovY/2 && pixels->v3[i].deg2 > -fovY/2 )
+           && pixels->v3[i].deg2 < fovY/2 && pixels->v3[i].deg2 > -fovY/2 
+#if !MY_PROJ
+           && pixels->v3[i].dist > 0
+#endif
+           )
        {
         float PId2 = PI/2;
         int x = (int)(((pixels->v3[i].deg1 + (fovX/2))*WIN_WIDTH)/fovX);
@@ -175,7 +209,7 @@ void focusCamera(v3 * cameraVector, v3 focusPoint, v3 playerPos, float * cameraT
             }
 }
 int main(){
-    v3 cameraVector = {.x = 1.0f, .y = 0.5f, .z = 0.0f};
+    v3 cameraVector = {.x = 1.0f, .y = 0.0f, .z = 0.0f};
     float cameraTilt = 0;
     v3 playerPos = { 0,0,0};
     struct v3list * worldpoints = malloc(400*sizeof(v3));
@@ -194,8 +228,8 @@ int main(){
         if(IsKeyDown(KEY_K)){
             EnableCursor();
         }
-        worldpoints->v3[350] = V3rotate((v3){1,1,1}, sens*5, worldpoints->v3[350]);
-        worldpoints->v3[349] = V3rotate((v3){1,1,1}, sens*5, worldpoints->v3[349]);
+        worldpoints->v3[350] = V3rotate((v3){0,0,1}, sens*5, worldpoints->v3[350]);
+        worldpoints->v3[349] = V3rotate((v3){0,0,1}, sens*5, worldpoints->v3[349]);
         if(IsKeyDown(KEY_G)){
             playerPos = worldpoints->v3[349];
             v3 rotator = {1,1,1};
@@ -246,7 +280,7 @@ int main(){
             MouseWasUp = 1;
         }
         //printf("playerPos:%f,%f,%f\ncameraPos:%f,%f,%f\nfps:%d\n",playerPos.x, playerPos.y,playerPos.z,cameraVector.x,cameraVector.y,cameraVector.z, GetFPS());
-        displayScreen(pixels, img, 360, 180);
+        displayScreen(pixels, img,180, 90);
         free(pixels);
     }
 }
