@@ -46,6 +46,16 @@ float V3lengthSq(v3 x){
     return (x.E[0]*x.E[0]+x.E[1]*x.E[1]+x.E[2]*x.E[2]);
 }
 v3 updatePos(v3 pos, v3 camera, int dir){
+#if MY_PROJ
+    float scale = 0.05f;
+    if(dir > 1){
+        camera = (v3){.x = -camera.y, .y = camera.x, 0 };
+        dir -= 3;
+    }
+    v3 normalized = V3normalize((v3){.x = sinf(camera.x), .y = sinf(camera.y), .z = 0});
+    v3 pos2 = {.x = pos.x + normalized.x*scale*dir, .y = pos.y + normalized.y*scale*dir, .z = pos.z}; 
+    return pos2;
+#else
     float scale = 0.05f;
     if(dir > 1){
         camera = (v3){.x = -camera.y, .y = camera.x, 0 };
@@ -54,6 +64,7 @@ v3 updatePos(v3 pos, v3 camera, int dir){
     v3 normalized = V3normalize((v3){.x = sinf(-camera.x), .y = sinf(camera.y), .z = 0});
     v3 pos2 = {.x = pos.x + normalized.x*scale*dir, .y = pos.y + normalized.y*scale*dir, .z = pos.z}; 
     return pos2;
+#endif
 }
 v3 V3rotate(v3 axis, float angle, v3 vector){
     if(angle == 0)
